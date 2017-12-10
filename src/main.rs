@@ -5,6 +5,7 @@ extern crate serde_json;
 extern crate serde_derive;
 
 extern crate reqwest;
+extern crate rand;
 
 use reqwest::Client;
 use reqwest::Url;
@@ -13,6 +14,8 @@ use std::io;
 use std::error;
 
 use std::result::Result;
+use rand::Rng;
+use rand::OsRng;
 
 #[derive(Deserialize, Debug)]
 struct DnsQuestion {
@@ -52,7 +55,7 @@ struct DnsResponse {
   question: Vec<DnsQuestion>,
   
   #[serde(rename="Answer")]
-  answer: Vec<DnsAnswer>,
+  answer: Option<Vec<DnsAnswer>>,
   
   #[serde(rename="Comment")]
   comment: Option<String>,
@@ -62,8 +65,12 @@ static API_PATH: &'static str = "https://dns.google.com/resolve";
 
 // https://developers.google.com/speed/public-dns/docs/dns-over-https
 
-fn lookup_hostname(hostname: String, record_type: String) -> Result<DnsResponse, Box<error::Error>> {
-  let random_string = String::from("4");
+fn lookup_hostname(rng: &mut OsRng, hostname: String, record_type: String) -> Result<DnsResponse, Box<error::Error>> {
+  
+  let random_padding_len = (rng.next_u32() & 0xf) as usize;
+  let random_string = rng.gen_ascii_chars().take(random_padding_len).collect();
+  
+  println!("random_string = {}", random_string);
   
   let url = Url::parse_with_params(API_PATH, &[
     ("name", hostname),
@@ -81,6 +88,8 @@ fn lookup_hostname(hostname: String, record_type: String) -> Result<DnsResponse,
 }
 
 fn main() {
+  let mut rng = rand::os::OsRng::new().unwrap();
+  
   println!("Enter the hostname to resolve");
   let mut hostname = String::new();
   
@@ -92,7 +101,7 @@ fn main() {
   
   let rtype = String::from("A");
   
-  match lookup_hostname(hostname, rtype) {
+  match lookup_hostname(&mut rng, hostname, rtype) {
     Ok(res) => println!("Got response: {:?}", res),
     Err(e) => println!("Got error: {}", e),
   };
