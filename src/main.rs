@@ -6,16 +6,11 @@ extern crate serde_derive;
 
 extern crate reqwest;
 extern crate rand;
-
-extern crate hex_slice;
 extern crate dns_parser;
-
-use hex_slice::AsHex;
 
 use reqwest::Client;
 use reqwest::Url;
 use reqwest::header::UserAgent;
-use std::io;
 use std::error;
 
 use std::net::UdpSocket;
@@ -36,7 +31,7 @@ struct DnsQuestion {
 struct DnsAnswer {
   name: String,
   #[serde(rename="type")]
-  typ: i32,
+  typ: u8,
   ttl: Option<i32>,
   data: String,
 }
@@ -73,18 +68,18 @@ static API_PATH: &'static str = "https://dns.google.com/resolve";
 
 // https://developers.google.com/speed/public-dns/docs/dns-over-https
 
-fn lookup_hostname(rng: &mut OsRng, hostname: String, record_type: String) -> Result<DnsResponse, Box<error::Error>> {
+fn lookup_hostname(rng: &mut OsRng, hostname: String, qtype: u8) -> Result<DnsResponse, Box<error::Error>> {
   
   let random_padding_len = (rng.next_u32() & 0xf) as usize;
   let random_string = rng.gen_ascii_chars().take(random_padding_len).collect();
   
-  println!("random_string = {}", random_string);
-  
   let url = Url::parse_with_params(API_PATH, &[
     ("name", hostname),
-    ("type", record_type),
+    ("type", qtype.to_string()),
     ("random_padding", random_string)])?;
-    
+
+  println!("url: {:?}", url);
+
   let mut response = Client::new()
     .get(url)
     .header(UserAgent::new("DnsOverHttpsProxy/1"))
@@ -122,6 +117,40 @@ fn main() {
     };
     
     println!("Packet: {:?}", packet);
+    
+    // Make sure we actually got a query, otherwise ignore it.
+    if !packet.header.query {
+      println!("Not a query, ignoring");
+      continue;
+    }
+    
+    if packet.header.questions != 1 || packet.questions.len() != 1 {
+      // TODO: Implement multiple question handling.
+      println!("Expected only 1 question, ignoring");
+      continue;
+    }
+    
+    // Get the server name
+    let hostname = String::from(&packet.questions[0].qname.to_string()[..]);
+    let qtype = packet.questions[0].qtype as u8;
+    println!("hostname: {}, type: {}", hostname, qtype);
+    
+    // Make a query
+    let res = match lookup_hostname(&mut rng, hostname, qtype) {
+      Ok(res) => (res),
+      Err(e) => {
+        println!("Got error from DNS over HTTP: {}", e);
+        continue;
+      }
+    };
+    
+    println!("Response: {:?}", res)
+    
+    // Send our response
+    /*match socket.send_to(..., src) {
+      Ok(n) => println!("Data sent: {}", n),
+      Err(e) => println!("Error sending response: {}", e),
+    }*/
   }
   /*
   
