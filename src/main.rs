@@ -10,19 +10,19 @@ extern crate serde_json;
 pub mod pdns;
 
 use std::net::UdpSocket;
-use rand::OsRng;
 use std::str::FromStr;
 
 use domain::bits::message::Message;
 //use domain::iana::{Class, Rtype};
 use domain::rdata::{A, Aaaa, Cname, Mx};
 use domain::bits::{ComposeMode, DNameBuf, MessageBuilder};
+use ::pdns::Pdns;
 
 static DEFAULT_TTL : u32 = 180;
 
 fn main() {
   env_logger::init().unwrap();
-  let mut rng = OsRng::new().unwrap();
+  let mut pdns = Pdns::new();
 
   let socket = UdpSocket::bind("127.0.0.1:35353").expect("couldn't bind to addr");
   let mut buf = [0; 1400];
@@ -75,7 +75,7 @@ fn main() {
     }
 
     // Make a query
-    let res = match pdns::lookup_hostname(&mut rng, hostname, qtype) {
+    let res = match pdns.lookup_hostname(hostname, qtype) {
       Ok(res) => (res),
       Err(e) => {
         warn!("Got error from DNS over HTTP: {}", e);

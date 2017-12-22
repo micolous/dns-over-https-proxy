@@ -49,25 +49,38 @@ pub struct DnsResponse {
 
 static API_PATH: &'static str = "https://dns.google.com/resolve";
 
+pub struct Pdns {
+  rng: OsRng,
+  client: Client,
+}
+
 // https://developers.google.com/speed/public-dns/docs/dns-over-https
+impl Pdns {
+  pub fn new() -> Pdns {
+    Pdns {
+      rng: OsRng::new().unwrap(),
+      client: Client::new(),
+    }
+  }
 
-pub fn lookup_hostname(rng: &mut OsRng, hostname: String, qtype: u16) -> Result<DnsResponse, Box<error::Error>> {
-  let random_padding_len = (rng.next_u32() & 0xf) as usize;
-  let random_string = rng.gen_ascii_chars().take(random_padding_len).collect();
+  pub fn lookup_hostname(&mut self, hostname: String, qtype: u16) -> Result<DnsResponse, Box<error::Error>> {
+    let random_padding_len = (self.rng.next_u32() & 0xf) as usize;
+    let random_string = self.rng.gen_ascii_chars().take(random_padding_len).collect();
 
-  let url = Url::parse_with_params(API_PATH, &[
-    ("name", hostname),
-    ("type", qtype.to_string()),
-    ("random_padding", random_string)])?;
+    let url = Url::parse_with_params(API_PATH, &[
+      ("name", hostname),
+      ("type", qtype.to_string()),
+      ("random_padding", random_string)])?;
 
-  debug!("url: {:?}", url);
+    debug!("url: {:?}", url);
 
-  let mut response = Client::new()
-    .get(url)
-    .header(UserAgent::new("DnsOverHttpsProxy/1"))
-    .send()?;
+    let mut response = self.client
+      .get(url)
+      .header(UserAgent::new("DnsOverHttpsProxy/1"))
+      .send()?;
 
-  let out: DnsResponse = response.json()?;
+    let out: DnsResponse = response.json()?;
 
-  Ok(out)
+    Ok(out)
+  }
 }
