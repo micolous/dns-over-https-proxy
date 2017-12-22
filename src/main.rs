@@ -1,25 +1,15 @@
 #[macro_use] extern crate log;
 extern crate env_logger;
-
-extern crate serde;
-extern crate serde_json;
-
-#[macro_use]
-extern crate serde_derive;
-
 extern crate reqwest;
 extern crate rand;
 extern crate domain;
+extern crate serde;
+extern crate serde_json;
+#[macro_use] extern crate serde_derive;
 
-use reqwest::Client;
-use reqwest::Url;
-use reqwest::header::UserAgent;
-use std::error;
+pub mod pdns;
 
 use std::net::UdpSocket;
-
-use std::result::Result;
-use rand::Rng;
 use rand::OsRng;
 use std::str::FromStr;
 
@@ -28,79 +18,11 @@ use domain::bits::message::Message;
 use domain::rdata::{A, Aaaa, Cname, Mx};
 use domain::bits::{ComposeMode, DNameBuf, MessageBuilder};
 
-#[derive(Deserialize, Debug)]
-struct DnsQuestion {
-  name: String,
-  #[serde(rename="type")]
-  typ: u8,
-}
-
-#[derive(Deserialize, Debug)]
-struct DnsAnswer {
-  name: String,
-  #[serde(rename="type")]
-  typ: u8,
-  ttl: Option<u32>,
-  data: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct DnsResponse {
-  #[serde(rename="Status")]
-  status: i32,
-  #[serde(rename="TC")]
-  truncated: bool,
-  
-  // "Always true for Google Public DNS"
-  //#[serde(rename="RD")]
-  //rd: bool,
-  //#[serde(rename="RA")]
-  //ra: bool,
-  
-  #[serde(rename="AD")]
-  dnssec_validated: bool,
-  #[serde(rename="CD")]
-  dnssec_disabled: bool,
-  
-  #[serde(rename="Question")]
-  question: Vec<DnsQuestion>,
-  
-  #[serde(rename="Answer")]
-  answer: Option<Vec<DnsAnswer>>,
-  
-  #[serde(rename="Comment")]
-  comment: Option<String>,
-}
-
-static API_PATH: &'static str = "https://dns.google.com/resolve";
 static DEFAULT_TTL : u32 = 180;
-
-// https://developers.google.com/speed/public-dns/docs/dns-over-https
-
-fn lookup_hostname(rng: &mut OsRng, hostname: String, qtype: u16) -> Result<DnsResponse, Box<error::Error>> {
-  let random_padding_len = (rng.next_u32() & 0xf) as usize;
-  let random_string = rng.gen_ascii_chars().take(random_padding_len).collect();
-
-  let url = Url::parse_with_params(API_PATH, &[
-    ("name", hostname),
-    ("type", qtype.to_string()),
-    ("random_padding", random_string)])?;
-
-  debug!("url: {:?}", url);
-
-  let mut response = Client::new()
-    .get(url)
-    .header(UserAgent::new("DnsOverHttpsProxy/1"))
-    .send()?;
-
-  let out: DnsResponse = response.json()?;
-
-  Ok(out)
-}
 
 fn main() {
   env_logger::init().unwrap();
-  let mut rng = rand::os::OsRng::new().unwrap();
+  let mut rng = OsRng::new().unwrap();
 
   let socket = UdpSocket::bind("127.0.0.1:35353").expect("couldn't bind to addr");
   let mut buf = [0; 1400];
@@ -153,7 +75,7 @@ fn main() {
     }
 
     // Make a query
-    let res = match lookup_hostname(&mut rng, hostname, qtype) {
+    let res = match pdns::lookup_hostname(&mut rng, hostname, qtype) {
       Ok(res) => (res),
       Err(e) => {
         warn!("Got error from DNS over HTTP: {}", e);
