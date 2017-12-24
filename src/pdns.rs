@@ -25,24 +25,24 @@ pub struct DnsResponse {
   pub status: i32,
   #[serde(rename="TC")]
   pub truncated: bool,
-  
+
   // "Always true for Google Public DNS"
   #[serde(rename="RD")]
   pub recursion_desired: bool,
   #[serde(rename="RA")]
   pub recursion_available: bool,
-  
+
   #[serde(rename="AD")]
   pub dnssec_validated: bool,
   #[serde(rename="CD")]
   pub dnssec_disabled: bool,
-  
+
   #[serde(rename="Question")]
   pub question: Vec<DnsQuestion>,
-  
+
   #[serde(rename="Answer")]
   pub answer: Option<Vec<DnsAnswer>>,
-  
+
   #[serde(rename="Comment")]
   pub comment: Option<String>,
 }

@@ -20,6 +20,20 @@ use ::pdns::Pdns;
 
 static DEFAULT_TTL : u32 = 180;
 
+macro_rules! dns_error {
+  ($socket:expr, $src:expr, $response:expr, $error_code:expr) => {{
+    {
+      let rheader = $response.header_mut();
+      rheader.set_rcode($error_code);
+    }
+
+    match $socket.send_to($response.finish().as_slice(), $src) {
+      Ok(n) => debug!("Data sent: {}", n),
+      Err(e) => warn!("Error sending response: {}", e),
+    }
+  }};
+}
+
 fn main() {
   env_logger::init().unwrap();
   let mut pdns = Pdns::new();
@@ -28,7 +42,7 @@ fn main() {
   let mut buf = [0; 1400];
 
   info!("Listening for DNS requests on port 35353");
-  
+
   loop {
     let (size, src) = match socket.recv_from(&mut buf) {
       Ok((size, src)) => (size, src),
@@ -37,10 +51,10 @@ fn main() {
         continue;
       }
     };
-    
+
     // Redeclare buf as the correct size
     let mut buf = &mut buf[..size];
-  
+
     let packet = match Message::from_bytes(&mut buf) {
       Ok(packet) => (packet),
       Err(e) => {
@@ -48,31 +62,33 @@ fn main() {
         continue;
       }
     };
-    
+
     // Make sure we actually got a query, otherwise ignore it.
     if packet.header().qr() {
       warn!("Not a query, ignoring");
       continue;
     }
-    
+
+    let mut response = MessageBuilder::new(ComposeMode::Limited(1400), true).unwrap();
+    {
+      let rheader = response.header_mut();
+      rheader.set_id(packet.header().id());
+      rheader.set_qr(true);
+    }
+
     let question = match packet.first_question() {
       Some(question) => (question),
       None => {
-        warn!("No question found in query, ignoring");
+        warn!("No question found in query");
+        dns_error!(socket, src, response, Rcode::FormErr);
         continue;
       }
     };
-    
+
     let hostname = format!("{}", question.qname().clone());
     let qtype = question.qtype().to_int();
     debug!("hostname: {}, type: {}", hostname, qtype);
 
-    let mut response = MessageBuilder::new(ComposeMode::Limited(1400), true).unwrap();
-    {
-      let rheader = response.header_mut();    
-      rheader.set_id(packet.header().id());
-      rheader.set_qr(true);
-    }
     response.push(question).unwrap();
 
     // Make a query
@@ -80,16 +96,7 @@ fn main() {
       Ok(res) => (res),
       Err(e) => {
         warn!("Got error from DNS over HTTP: {}", e);
-        
-        {
-          let rheader = response.header_mut();
-          rheader.set_rcode(Rcode::ServFail);
-        }
-
-        match socket.send_to(response.finish().as_slice(), src) {
-          Ok(n) => debug!("Data sent: {}", n),
-          Err(e) => warn!("Error sending response: {}", e),      
-        }        
+        dns_error!(socket, src, response, Rcode::ServFail);
         continue;
       }
     };
@@ -97,14 +104,14 @@ fn main() {
     debug!("Response: {:?}", res);
 
     {
-      let rheader = response.header_mut();    
+      let rheader = response.header_mut();
       rheader.set_rd(res.recursion_desired);
       rheader.set_ra(res.recursion_available);
       rheader.set_ad(res.dnssec_validated);
       rheader.set_cd(res.dnssec_disabled);
-    }    
+    }
 
-    
+
     let mut response = response.answer();
     match res.answer {
       Some(answers) => {
@@ -127,7 +134,7 @@ fn main() {
               response.push((
                 DNameBuf::from_str(answer.name.as_str()).unwrap(),
                 answer.ttl.unwrap_or(DEFAULT_TTL),
-                Mx::new(u16::from_str(v[0]).unwrap(), DNameBuf::from_str(v[1]).unwrap()))).unwrap();              
+                Mx::new(u16::from_str(v[0]).unwrap(), DNameBuf::from_str(v[1]).unwrap()))).unwrap();
             }
             28 => { // AAAA
               response.push((
@@ -145,12 +152,12 @@ fn main() {
       None => {
         let rheader = response.header_mut();
         rheader.set_rcode(Rcode::NXDomain);
-      } 
+      }
     }
-    
+
     match socket.send_to(response.finish().as_slice(), src) {
       Ok(n) => debug!("Data sent: {}", n),
-      Err(e) => warn!("Error sending response: {}", e),      
+      Err(e) => warn!("Error sending response: {}", e),
     }
   }
 }
