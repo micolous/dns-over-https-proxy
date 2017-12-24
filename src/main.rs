@@ -13,7 +13,7 @@ use std::net::UdpSocket;
 use std::str::FromStr;
 
 use domain::bits::message::Message;
-//use domain::iana::{Class, Rtype};
+use domain::iana::{Rcode};
 use domain::rdata::{A, Aaaa, Cname, Mx};
 use domain::bits::{ComposeMode, DNameBuf, MessageBuilder};
 use ::pdns::Pdns;
@@ -66,13 +66,14 @@ fn main() {
     let hostname = format!("{}", question.qname().clone());
     let qtype = question.qtype().to_int();
     debug!("hostname: {}, type: {}", hostname, qtype);
-    
+
     let mut response = MessageBuilder::new(ComposeMode::Limited(1400), true).unwrap();
     {
-      let rheader = response.header_mut();
+      let rheader = response.header_mut();    
       rheader.set_id(packet.header().id());
       rheader.set_qr(true);
     }
+    response.push(question).unwrap();
 
     // Make a query
     let res = match pdns.lookup_hostname(hostname, qtype) {
@@ -80,13 +81,29 @@ fn main() {
       Err(e) => {
         warn!("Got error from DNS over HTTP: {}", e);
         
+        {
+          let rheader = response.header_mut();
+          rheader.set_rcode(Rcode::ServFail);
+        }
+
+        match socket.send_to(response.finish().as_slice(), src) {
+          Ok(n) => debug!("Data sent: {}", n),
+          Err(e) => warn!("Error sending response: {}", e),      
+        }        
         continue;
       }
     };
 
     debug!("Response: {:?}", res);
-    
-    response.push(question).unwrap();
+
+    {
+      let rheader = response.header_mut();    
+      rheader.set_rd(res.recursion_desired);
+      rheader.set_ra(res.recursion_available);
+      rheader.set_ad(res.dnssec_validated);
+      rheader.set_cd(res.dnssec_disabled);
+    }    
+
     
     let mut response = response.answer();
     match res.answer {
@@ -126,7 +143,8 @@ fn main() {
         }
       },
       None => {
-        warn!("todo: handle null response");
+        let rheader = response.header_mut();
+        rheader.set_rcode(Rcode::NXDomain);
       } 
     }
     

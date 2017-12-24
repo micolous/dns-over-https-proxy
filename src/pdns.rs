@@ -27,10 +27,10 @@ pub struct DnsResponse {
   pub truncated: bool,
   
   // "Always true for Google Public DNS"
-  //#[serde(rename="RD")]
-  //recursion_desired: bool,
-  //#[serde(rename="RA")]
-  //recursion_available: bool,
+  #[serde(rename="RD")]
+  pub recursion_desired: bool,
+  #[serde(rename="RA")]
+  pub recursion_available: bool,
   
   #[serde(rename="AD")]
   pub dnssec_validated: bool,
