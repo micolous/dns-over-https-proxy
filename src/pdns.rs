@@ -7,14 +7,14 @@ use rand::{Rng, OsRng};
 pub struct DnsQuestion {
   pub name: String,
   #[serde(rename="type")]
-  pub typ: u8,
+  pub typ: u16,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct DnsAnswer {
   pub name: String,
   #[serde(rename="type")]
-  pub typ: u8,
+  pub typ: u16,
   pub ttl: Option<u32>,
   pub data: String,
 }

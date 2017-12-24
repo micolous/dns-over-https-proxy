@@ -13,8 +13,8 @@ use std::net::UdpSocket;
 use std::str::FromStr;
 
 use domain::bits::message::Message;
-use domain::iana::{Rcode};
-use domain::rdata::{A, Aaaa, Cname, Mx};
+use domain::iana::{Rcode, Rtype};
+use domain::rdata::{A, Aaaa, Cname, Mx, Txt};
 use domain::bits::{ComposeMode, DNameBuf, MessageBuilder};
 use ::pdns::Pdns;
 
@@ -116,32 +116,54 @@ fn main() {
     match res.answer {
       Some(answers) => {
         for answer in answers {
-          match answer.typ {
-            1 => { // A
+          match Rtype::from_int(answer.typ) {
+            Rtype::A => {
               response.push((
                 DNameBuf::from_str(answer.name.as_str()).unwrap(),
                 answer.ttl.unwrap_or(DEFAULT_TTL),
                 A::new(answer.data.parse().unwrap()))).unwrap();
             },
-            5 => { // CNAME
+            Rtype::Cname => {
               response.push((
                 DNameBuf::from_str(answer.name.as_str()).unwrap(),
                 answer.ttl.unwrap_or(DEFAULT_TTL),
                 Cname::new(DNameBuf::from_str(answer.data.as_str()).unwrap()))).unwrap();
             },
-            15 => { // MX
+            Rtype::Mx => {
               let v: Vec<&str> = answer.data.as_str().split(' ').collect();
               response.push((
                 DNameBuf::from_str(answer.name.as_str()).unwrap(),
                 answer.ttl.unwrap_or(DEFAULT_TTL),
                 Mx::new(u16::from_str(v[0]).unwrap(), DNameBuf::from_str(v[1]).unwrap()))).unwrap();
             }
-            28 => { // AAAA
+            Rtype::Aaaa => {
               response.push((
                 DNameBuf::from_str(answer.name.as_str()).unwrap(),
                 answer.ttl.unwrap_or(DEFAULT_TTL),
                 Aaaa::new(answer.data.parse().unwrap()))).unwrap();
             },
+            Rtype::Txt => {
+              // domain doesn't handle TXT records properly.
+              // Google Public DNS puts double quotes (") around the text
+              // content of the record.
+
+              // We need to compose it...
+              let mut t = answer.data.clone();
+              let l = t.len();
+              // Remove the trailing "
+              t.truncate(l - 1);
+
+              // Replace the first " with the length of the string in bytes
+              unsafe {
+                let r = t.as_bytes_mut();
+                r[0] = (l - 2) as u8;
+              }
+
+              response.push((
+                DNameBuf::from_str(answer.name.as_str()).unwrap(),
+                answer.ttl.unwrap_or(DEFAULT_TTL),
+                Txt::new(t))).unwrap();
+            }
             // TODO: handle other things
             _ => {
               warn!("unhandled response type {}", answer.typ);
