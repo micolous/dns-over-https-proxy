@@ -109,6 +109,7 @@ fn main() {
       rheader.set_ra(res.recursion_available);
       rheader.set_ad(res.dnssec_validated);
       rheader.set_cd(res.dnssec_disabled);
+      rheader.set_rcode(Rcode::from_int(res.status));
     }
 
 
@@ -146,23 +147,20 @@ fn main() {
               // domain doesn't handle TXT records properly.
               // Google Public DNS puts double quotes (") around the text
               // content of the record.
+              let mut o: Vec<u8> = Vec::new();
+              for t in answer.data.split("\"") {
+                if t.len() == 0 {
+                  continue;
+                }
 
-              // We need to compose it...
-              let mut t = answer.data.clone();
-              let l = t.len();
-              // Remove the trailing "
-              t.truncate(l - 1);
-
-              // Replace the first " with the length of the string in bytes
-              unsafe {
-                let r = t.as_bytes_mut();
-                r[0] = (l - 2) as u8;
+                o.push(t.len() as u8);
+                o.extend_from_slice(t.as_bytes());
               }
 
               response.push((
                 DNameBuf::from_str(answer.name.as_str()).unwrap(),
                 answer.ttl.unwrap_or(DEFAULT_TTL),
-                Txt::new(t))).unwrap();
+                Txt::new(o))).unwrap();
             }
             // TODO: handle other things
             _ => {
@@ -172,8 +170,7 @@ fn main() {
         }
       },
       None => {
-        let rheader = response.header_mut();
-        rheader.set_rcode(Rcode::NXDomain);
+        // Ignore empty response
       }
     }
 

@@ -15,6 +15,7 @@ pub struct DnsAnswer {
   pub name: String,
   #[serde(rename="type")]
   pub typ: u16,
+  #[serde(rename="TTL")]
   pub ttl: Option<u32>,
   pub data: String,
 }
@@ -22,7 +23,7 @@ pub struct DnsAnswer {
 #[derive(Deserialize, Debug)]
 pub struct DnsResponse {
   #[serde(rename="Status")]
-  pub status: i32,
+  pub status: u8,
   #[serde(rename="TC")]
   pub truncated: bool,
 
