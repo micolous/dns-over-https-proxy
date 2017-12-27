@@ -116,7 +116,7 @@ impl DnsServer {
                 Aaaa::new(answer.data.parse()?)))?;
             },
             Rtype::Txt => {
-              // domain doesn't handle TXT records properly.
+              // domain doesn't handle TXT records nicely.
               // Google Public DNS puts double quotes (") around the text
               // content of the record.
               let mut o: Vec<u8> = Vec::new();
@@ -171,6 +171,8 @@ impl DnsServer {
               Ok(n) => debug!("Data sent: {}", n),
               Err(e) => warn!("Error sending response: {}", e),
             }
+          } else {
+            debug!("Empty response");
           }
         },
         Err(e) => warn!("Error in handle_one_query: {}", e),
