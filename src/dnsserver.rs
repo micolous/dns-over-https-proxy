@@ -1,3 +1,4 @@
+/* -*- mode: rust; indent-tabs-mode: nil; tab-width: 2 -*- */
 use std::net::{UdpSocket, ToSocketAddrs};
 use std::str::FromStr;
 

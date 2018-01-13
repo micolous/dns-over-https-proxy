@@ -1,3 +1,4 @@
+/* -*- mode: rust; indent-tabs-mode: nil; tab-width: 2 -*- */
 use std::error;
 use reqwest::{Client, Url};
 use reqwest::header::UserAgent;
