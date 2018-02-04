@@ -6,6 +6,8 @@ It is not yet complete.  It currently supports `A`, `AAAA`, `CNAME`, `MX` and `T
 
 It is intended for use on either a single machine, or behind a better (ideally caching) DNS server like [BIND](https://www.isc.org/downloads/bind/), in order to reduce clear-text DNS being transmitted over the internet.
 
+> **Note**: This is not an official Google product. Please don't bug them about this. :)
+
 ## Building it
 
 [Install the current version of Rust](https://www.rustup.rs) and dependencies:
