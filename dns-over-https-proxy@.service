@@ -1,0 +1,14 @@
+[Unit]
+Description=DNS over HTTPS Proxy (on %i)
+After=network.unit
+Requires=network.unit
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/dns-over-https-proxy %i
+User=nobody
+StandardOutput=null
+
+[Install]
+WantedBy=multi-user.target
+
