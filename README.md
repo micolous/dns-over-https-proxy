@@ -4,7 +4,7 @@ This is a simple DNS server that proxies requests to [Google Public DNS](https:/
 
 It is not yet complete.  It currently supports `A`, `AAAA`, `CNAME`, `MX` and `TXT` records.
 
-It is intended for use on either a single machine, or behind a better (ideally caching) DNS server like [BIND](https://www.isc.org/downloads/bind/), in order to reduce clear-text DNS being transmitted over the internet.
+It is intended for use on either a single machine, or behind a better (ideally caching) DNS server like [BIND](https://www.isc.org/downloads/bind/), in order to reduce clear-text DNS being transmitted over the internet.  This relies on the premise that you [trust Google with all of your DNS traffic](https://developers.google.com/speed/public-dns/privacy).
 
 > **Note**: This is not an official Google product. Please don't bug them about this. :)
 
@@ -95,7 +95,11 @@ The primary goal of this project is to act as a forwarder for BIND. However, the
 
 * ...and repeat.
 
-BIND has configuration options that allow us to break the loop, at the expense of possibly leaking DNS queries to `dns.google.com`.  This configurations uses Google Public DNS via the DNS protocol (unencrypted):
+### Breaking the loop with BIND
+
+BIND has configuration options that allow us to break the loop, at the expense of leaking DNS queries to `dns.google.com`. While an attacker (or your ISP) could intercept your requests to 8.8.8.8, `reqwests` (when used with a functional OpenSSL implementation, and reliable certificate chain) will fail in the event that your traffic has been redirected.
+
+This configuration uses Google Public DNS via the DNS protocol (unencrypted), and then forwards everything else to this program.
 
 ```
 // In local view / global zone config
@@ -124,4 +128,15 @@ options {
 };
 ```
 
-Alternatively, the system resolver on the DNS server can be set to a different host.
+### Breaking the loop with the system resolver
+
+The system resolver can also break this loop in two different ways:
+
+* Use a DNS server other than `localhost`.
+
+* Hard code IP addresses for `dns.google.com` in `/etc/hosts`, eg:
+
+```
+216.239.32.27 dns.google.com
+```
+
