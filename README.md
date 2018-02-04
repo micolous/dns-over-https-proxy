@@ -91,6 +91,8 @@ The primary goal of this project is to act as a forwarder for BIND. However, the
 
 * This program connects to `dns.google.com`, and needs to know the IP address of it.
 
+* The system resolver contacts BIND to look up the name.
+
 * BIND needs an upstream resolver in order to resolve `dns.google.com`, and contacts this program.
 
 * ...and repeat.
