@@ -21,10 +21,11 @@
  */
 use std::net::{UdpSocket, ToSocketAddrs};
 use std::str::FromStr;
+use std::iter::FromIterator;
 
 use domain::bits::message::Message;
 use domain::iana::{Rcode, Rtype};
-use domain::rdata::{A, Aaaa, Cname, Mx, Txt};
+use domain::rdata::{A, Aaaa, Cname, Mx, Ns, Ptr, Soa, Srv, Txt};
 use domain::bits::{ComposeMode, DNameBuf, MessageBuilder};
 use ::pdns::Pdns;
 use std::error;
@@ -117,12 +118,21 @@ impl DnsServer {
                 answer.ttl.unwrap_or(DEFAULT_TTL),
                 A::new(answer.data.parse()?)))?;
             },
+
+            Rtype::Aaaa => {
+              response.push((
+                DNameBuf::from_str(answer.name.as_str())?,
+                answer.ttl.unwrap_or(DEFAULT_TTL),
+                Aaaa::new(answer.data.parse()?)))?;
+            },
+
             Rtype::Cname => {
               response.push((
                 DNameBuf::from_str(answer.name.as_str())?,
                 answer.ttl.unwrap_or(DEFAULT_TTL),
                 Cname::new(DNameBuf::from_str(answer.data.as_str())?)))?;
             },
+
             Rtype::Mx => {
               let v: Vec<&str> = answer.data.as_str().split(' ').collect();
               response.push((
@@ -130,12 +140,60 @@ impl DnsServer {
                 answer.ttl.unwrap_or(DEFAULT_TTL),
                 Mx::new(u16::from_str(v[0])?, DNameBuf::from_str(v[1])?)))?;
             }
-            Rtype::Aaaa => {
+
+            Rtype::Ns => {
               response.push((
                 DNameBuf::from_str(answer.name.as_str())?,
                 answer.ttl.unwrap_or(DEFAULT_TTL),
-                Aaaa::new(answer.data.parse()?)))?;
+                Ns::new(DNameBuf::from_str(answer.data.as_str())?)))?;
             },
+
+            Rtype::Ptr => {
+              response.push((
+                DNameBuf::from_str(answer.name.as_str())?,
+                answer.ttl.unwrap_or(DEFAULT_TTL),
+                Ptr::new(DNameBuf::from_str(answer.data.as_str())?)))?;
+            },
+
+            Rtype::Soa => {
+              let o = Vec::from_iter(answer.data.split(" "));
+              let ol = o.len();
+              if ol != 7 {
+                warn!("expected 7 tokens in SOA, got {}", ol);
+                continue;
+              }
+
+              response.push((
+                DNameBuf::from_str(answer.name.as_str())?,
+                answer.ttl.unwrap_or(DEFAULT_TTL),
+                Soa::new(
+                  DNameBuf::from_str(o[0])?,
+                  DNameBuf::from_str(o[1])?,
+                  u32::from_str(o[2])?,
+                  u32::from_str(o[3])?,
+                  u32::from_str(o[4])?,
+                  u32::from_str(o[5])?,
+                  u32::from_str(o[6])?)))?;
+            },
+
+            Rtype::Srv => {
+              let o = Vec::from_iter(answer.data.split(" "));
+              let ol = o.len();
+              if ol != 4 {
+                warn!("expected 4 tokens in SRV, got {}", ol);
+                continue;
+              }
+
+              response.push((
+                DNameBuf::from_str(answer.name.as_str())?,
+                answer.ttl.unwrap_or(DEFAULT_TTL),
+                Srv::new(
+                  u16::from_str(o[0])?,
+                  u16::from_str(o[1])?,
+                  u16::from_str(o[2])?,
+                  DNameBuf::from_str(o[3])?)))?;
+            },
+
             Rtype::Txt => {
               // domain doesn't handle TXT records nicely.
               // Google Public DNS puts double quotes (") around the text

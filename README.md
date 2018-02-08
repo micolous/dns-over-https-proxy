@@ -2,7 +2,7 @@
 
 This is a simple DNS server that proxies requests to [Google Public DNS](https://developers.google.com/speed/public-dns/docs/dns-over-https).
 
-It is not yet complete.  It currently supports `A`, `AAAA`, `CNAME`, `MX` and `TXT` records.
+It is not yet complete.  It currently supports a limited number of record types.
 
 It is intended for use on either a single machine, or behind a better (ideally caching) DNS server like [BIND](https://www.isc.org/downloads/bind/), in order to reduce clear-text DNS being transmitted over the internet.  This relies on the premise that you [trust Google with all of your DNS traffic](https://developers.google.com/speed/public-dns/privacy).
 
@@ -141,4 +141,18 @@ The system resolver can also break this loop in two different ways:
 ```
 216.239.32.27 dns.google.com
 ```
+
+## Supported record types
+
+Per [RFC 1035](https://www.ietf.org/rfc/rfc1035.txt) unless otherwise stated:
+
+* A
+* AAAA (RFC 3596)
+* CNAME
+* MX
+* NS
+* PTR
+* SOA
+* SRV (RFC 2782)
+* TXT
 
