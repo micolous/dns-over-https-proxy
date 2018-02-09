@@ -1,8 +1,8 @@
 # dns-over-https-proxy
 
-This is a simple DNS server that proxies requests to [Google Public DNS](https://developers.google.com/speed/public-dns/docs/dns-over-https).
+This is a simple DNS server that proxies requests to [Google Public DNS](https://developers.google.com/speed/public-dns/docs/dns-over-https).  This was an exercise to help me learn Rust.
 
-It is not yet complete.  It currently supports a limited number of record types.
+It is not yet complete.  It currently supports a limited number of record types.  It also doesn't handle parallel incoming requests properly.
 
 It is intended for use on either a single machine, or behind a better (ideally caching) DNS server like [BIND](https://www.isc.org/downloads/bind/), in order to reduce clear-text DNS being transmitted over the internet.  This relies on the premise that you [trust Google with all of your DNS traffic](https://developers.google.com/speed/public-dns/privacy).
 
